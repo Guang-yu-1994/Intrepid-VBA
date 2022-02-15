@@ -255,13 +255,17 @@ Cells(margin_row, ISL_col).Value = 0.2
 
 
 Set JP_cell = Cells.Find("Intrepid Japan", searchformat:=False, lookat:=xlPart)
+If JP_cell Is Nothing Then GoTo no_JP
 JP_col = JP_cell.Column
 Cells(margin_row, JP_col).Value = 0.436665909879517
+no_JP:
 
 ' add Intrepid Spirits Ireland Ltd if it dose not exist in the internalSales
 Set IDL_cell = Cells.Find("Intrepid Spirits Ireland Ltd", searchformat:=False, lookat:=xlPart)
+If IDL_cell Is Nothing Then GoTo no_IDL
 IDL_col = IDL_cell.Column
 Cells(margin_row, IDL_col).Value = 0.2
+no_IDL:
 
 ' set the formula of inventory = balance * margin
 Dim finish_good_row As Integer, InternalSales_col As Integer, RE_row As Integer
