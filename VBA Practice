@@ -1,0 +1,87 @@
+1. while循环容易理解，但是判断单元格为""时遇到合并单元格的话会出意外，
+此时使用for循环
+
+2.clear是清除所有，会对currentregion产生影响
+
+3.cells(1,2).formulaR1C1 = "sum(RC[-1]:RC[-1]" 
+R后面是行偏移，C后面是列偏移，负数用[]
+偏移的表达式识别不了小括号，里面运算要去括号
+range.FormulaR1C1是提取该range内公示的字符串 "=sum(B1,C1)"
+Range.Formula是将该range中表示单元格位置的内容整成字符串"=Sum("B1","C1")"
+当单元格为空,range.formulaR1C1返回值是""，所以当需要在原先FormulaR1C1基础上再加公式的
+可以用if语句对于Range.HasFormula做出判断再写，这点内核
+
+4.可以用一个string先储存单元格相对位置，为之后求和公式做准备
+c = cells(1,1).address(RowAbsolute:=False, ColumnAbsolute:=False)
+
+5.计算一整列或者一整行Sum,用range的写入公式比用循环更省时间
+Range(Cells(start_account_row, c + 1), Cells(last_row, c + 1)).Formula2R1C1 = "=sum(RC[" & -merged_company_cols + 1 & "]:RC[-1])"
+
+6.动态数组需要Redim之后才能赋值
+for i = 1 to 100
+  Redim Preserve arr(i)
+  arr(i) = i 
+next
+
+7. rmdir之前要先Kill
+If Len(Dir(intercompany_checked, vbDirectory)) > 0 Then
+    If Dir(intercompany_checked & "*.*") <> "" Then
+        Kill intercompany_checked & "*.*"
+    End If
+    RmDir intercompany_checked
+    MkDir intercompany_checked
+Else
+    MkDir intercompany_checked
+End If
+
+8. 跨sheet选择range要指明sheet名字，否则就1004错误
+或者先activate某个sheet
+
+9，循环一个方阵行一次列一次，先设定方阵为range，之后用
+For data_col = 1 To data_rng.Columns.Count
+    For data_row = 1 To data_rng.Rows.Count
+    ....
+    Next
+Next
+
+10.Option Explicit
+如果使用，Option Explicit 语句必须写在模块的所有过程之前。
+如果模块中使用了 Option Explicit，则必须使用 Dim、Private、Public、ReDim 或 Static 语句来显式声明所有的变量。如果使用了未声明的变量名在编译时间会出现错误。
+如果没有使用 Option Explicit 语句，除非使用 Deftype 语句指定了缺省类型，否则所有未声明的变量都是 Variant 类型的。
+注意 使用 Option Explicit 可以避免在键入已有变量时出错，在变量的范围不是很清楚的代码中使用该语句可以避免混乱。
+如果定义全局变量需要这一句，但貌似各个子过程之间变量命名不可重复
+
+11. GetObject
+set wb = GetObject("wmx.xlsx")
+之后一定要wb.Close
+
+12. 用workbooks.Open 另一个工作簿的时候，明确该工作簿工作表不能sheet1,要sheets("sheet1")，
+所以最好在之前先Acticate目标工作表，以免出错，不然range的里面Cells也要明确工作簿工作表
+
+13. Range.address 返回相对地址
+expression.Address (RowAbsolute：=false, ColumnAbsolute：=false)
+用函数返回一个地址的时候，要返回相对地址，便于下一个sub调用，
+Range("$A14")会报错，range里面只能是相对地址，不能有$
+
+14. 求合并单元格最后一个地址最好用split而不是right，因为地址的字符数不确定
+Set adj_num_from = Split(crng.MergeArea.Address(RowAbsolute:=False, ColumnAbsolute:=False), ":")(1)
+
+15. 函数名不要与空间名称一致，否则出错
+
+16.最后一个单元格
+Set last_cell = Cells.Find(What:="*", After:=Cells(1, 1), SearchFormat:=False, SearchOrder:=xlByColumns, SearchDirection:=xlPrevious)
+
+17. 筛选之前后都关闭筛选mode
+If AutoFilterMode Then
+    AutoFilterMode = Not AutoFilterMode
+End If
+
+18. 多个if条件判断用数组简化
+Sheets("InternalSales").Activate
+non_company = Array("Financial Row", "Parent Company", "Amount", "Total")
+non_company_str = Join(non_company, "|")
+For Each crng In BS_header
+    If crng.Value <> "" And VBA.InStr(non_company_str, crng.Value) <= 0 Then
+        Cells(1, Columns.Count).End(xlToLeft).Offset(0, 1).Value = crng.Value
+    End If
+Next
