@@ -1,0 +1,320 @@
+1. Variant相加可能导致意外结果，程序声明变量类型很重要
+Eg. "2" + "3" = "23"
+VBA计算30000 * 2出错，因为计算时是根据算式中最大数字确定分配的数据类型
+如30000是integer,但是计算结果却是60000,超出integer的存储范围，所以要
+告诉计算机30000是Long,写成:
+30000& * 2
+用特殊字符代表的数据类型：
+% Integer
+& Long
+! Single
+@ currency
+$ String
+# Double
+
+2. 特殊符号
+_ 是换行，语句太长可以使用，前面须有空格， 字符串要使用"string" & _
+"string"
+: 是把多行拼接成一行，如dim a as integer : dim b as string
+\ 整除
+
+3. Date
+Excel中能表示的最早日期是1900年1月1日
+dim d as date
+' date中是MM/DD/YYYY
+d = #1/19/2016 12:20:32#
+
+Date是获取系统当前年月日，Time()返回当前时分秒，Now()当前年月日时分秒
+dim d as date
+d = Date
+msgbox d
+d = Time()
+msgbox d
+
+Year(d)可获取年份
+
+DateDiff(单位,起始时间，截止时间)计算两个时间的时间差
+DateDiff("yyyy",#8/3/2020#,#2/2/2022#)
+"yyyy" 年， "m"月， "q"季度， "d"日， "h"小时,"n"分钟，"s"秒
+"y"当年第几日
+"w"周，按实际天数计算，不足7天为0周
+"ww"周，按跨越周日个数计算，每跨越一个周日算一周
+
+
+DateAdd(单位,跨越长度,起始时间) 跨越长度是负数说明向前推算
+
+日期类型本质上是double，可以做加减法，加整数就是加天数，加1/24就是加1小时
+
+4. 正则表达式中如有双引号，则在写pattern的时候用"他说""正则表达式""的"
+dim myMatches as Object, myMatch as Object
+set myMatches = myreg.execute("字符串")
+For each myMatch in myMatches
+    Cells(1,i) = myMatch
+    i = i + 1
+Next
+
+分组
+myreg.pattern = "(\d*)(\w*)"
+set myMatches = myreg.execute("字符串")
+For each myMatch in myMatches
+    Cells(1,i) = myMatch.submatches(0)
+    Cells(2,i) = myMatch.submatches(1)
+    i = i + 1
+Next
+
+$n代表第n个圆括号的内容
+cells(2,2) = myreg.Replace("字符串","$1:$2") '生成新字符串的内容是将原字符串的内容替换为第1个圆括号:第二个圆括号的形式
+
+5. GoTo 可以用于一次性跳出多层循环
+GoTo也可以用于错误处理
+On Error GoTo MyError
+
+6. IsDate(x)判断是不是日期，IsNumeric(X)判断是不是数值，如果是Date返回False.
+TypeName(X)返回一个字符串，告诉数据的类型
+CInt(X)转换为整数
+CStr(X)转换为字符串
+CLng(X),CDbl(X),CCur(X),CDate(X),CBool(X)
+VBA中的CInt,Round是银行家四舍五入，如4.5是4，按照离最近的偶数
+Application.Function.Round是正常四舍五入
+VBA中也可以Int(x + 0.5)来整成正常的四舍五入
+
+7.Excel表格中只能存放1900以后的数据，VBA中可以实现之前的
+从VBA中将1900以前的日期写入表格时，可以先CStr再写入。
+
+8. msgbox中换行显示& Chr(13) & Chr(10) &回车换行
+s = "sssssssssss" & Chr(13) & Chr(10) & "ssssssssssss"
+
+Chr()显示根据ASCII码显示字符,实现从数字到字符的转换
+For i = 65 to 90
+  Cells(i - 63,2) = Chr(i)
+Next
+
+字符串可以比较大小用ASCII码
+
+9.Array可以不从0开始，
+Dim arr(3 To 6) 就下标从3到6共4个
+数组长度可以用Redim定义
+
+10. Split分割出来的东西用数组接
+s = ",张三, , 李四,,王"
+a = Split(s,",")
+'看拆出来有几个非空
+For Each x in a
+    If x <> "" Then i = i + 1
+Next x
+
+Redim b(i-1) '最大下标i-1可以容纳i个元素
+
+11.VBA读写文本文件
+（1）读取文本文件
+For input是为了读入,As后面是为了给文件编号
+Open "文件路径" For Input As #1
+
+（2）逐行读取
+Line Input #1,s 读取1号文件的1行，保存到变量s
+Cells(1,1) = s
+
+Do While EOF(1) = False  ' End of File 1号文件还没到末尾,或者While Not EOF
+  Line Input #1,s
+  Cells(i,1) = s
+  i = i + 1
+Loop
+Close #1 '一定要关闭文件
+
+12. VBA输出文本文件
+For Append是追加模式，但是Output是覆盖
+Open "文件路径" For Output As #1
+Print #1, Trim(Cells(1,1)) '空白写入时换行
+Print #1, Trim(Cells(2,1))； '有分号写入时不换行
+Print #1, Trim(Cells(3,1))
+Close #1 '一定要关闭文件
+
+13. Dir("d:\*.xlsx") 只寻找xlsx结尾的文件名
+Dir(file)，如果file不存在，则返回空字符，可用于判断文件存不存在
+Dir(file, vbDirectory)范围目标路径下的所有文件和文件夹
+再次Dir是下一个文件名名称，直到Dir为空则说明遍历完了
+
+13. Newsheet可以设置为事件，设置新表格格式
+Worksheet_change事件是表中内容改变，甚至点击去什么不做点出来也触发
+改变格式，合并单元格不触发Change
+让某句不触发Event:
+Application.EnableEvents = False
+语句
+Application.EnableEvents = False
+
+14. Dictionary主要用于去重
+Set dict = CreateObject("Scripting.Dictionary") '大小写必须一模一样
+For i = 4 to 21
+  k = Cells(1,2)
+  If dict.exists(k) Then
+    dict.Item(k) = dict.Item(k) + Cells(i,4).Value	
+  Else
+    dict.Add k, Cells(i, 4).Value
+  End If
+Next i
+
+Dictionary.Count显示条目数
+i = dict.Count
+If i > 0 Then
+  a = dict.keys()
+  b = dict.Items()
+  Range(Cells(4,8),Cells(i + 3, 8)) = Application.Transpose(a)
+  Range(Cells(4,9),Cells(i + 3, 9)) = Application.Transpose(b)
+End If
+
+Dictionary.Key("wmx") = "WMX"
+Dictionary.Remove(k) '删除Key为k的元素
+Dictionary.RemoveAll '删除字典所有元素
+subtotal_dict.Remove (subtotal_dict.Count - 1) '删除字典最后一个
+
+
+dict(k) = 2 如果k存在，则创建新键值对，否则修改值
+用单元格作为Key
+dict(cells(1,1))
+用单元格的值作为Key
+dict(cells(1,1).Value)
+
+
+
+15. 静态变量
+定义在子过程外
+Option Explicit
+Dim x
+Public z
+可以实现多个子过程之间的变量数值传递
+End语句可以结束所有VBA工程，相当于重置，静态变量也重置
+
+16. SelectCase简化多分支If
+Select Case c
+   Case "USD":
+     rate = 6.9
+   Case "RMB":
+     rate = 1
+   Case "EUR":
+     rate = 7.5
+   Case Else:
+     Msgbox "WMX"
+End Select
+
+Case中常用操作
+(1)使用逗号表示或者
+Case 3,5,7
+(2)To表示范围
+Case 2 To 8
+(3) Is > 等表示范围
+Case Is > o
+
+Case 7 To 9, 30 To 190:
+Case Is < 7, Is > 21:
+
+17. Empty是Variant中的0和""
+IsEmpty(x）
+   Nothing是Object中的空
+Is Nothing
+
+18. Word VBA
+Application  代表Word软件
+Document 代表Word文档
+Characters 文档中所有字符
+Characters(200)第二个字符
+Dim i As Long, c As Range, d As Document
+For i  = 1 To Application.ActiveDocument.Characters.Count
+  Set c = Application.ActiveDocument.Characters(i)
+  If IsNumeric(c.Text) Then
+    c.Bold = True
+    c.Font.ColorIndex = wdRed
+    c.Italic = True
+  End If
+
+Range(3,8)第3个字符到第8个字符，从0开始，到7
+Document.Range.Text该文档全部文本
+
+Word正则
+set d = Application.ActiveDocument
+Set reg = CreateObject("vbscript.regexp")
+reg.Pattern = "\d+\.?\d+%"
+reg.Global = True
+Set mches = reg.Execute(d.Range.Text)
+For Each mch In mches
+  Set c = d.Range(mch.firstindex, mch.firstindex + mch.Length)
+  c.Font.ColorIndex = wdRed
+Next mch 
+
+Word段落保存新文件
+Set d1 = ActiveDocument
+i = 1
+For Each p In d1.Paragraphs
+    set d2 = Application.Documents.Add
+    d2.Range.Text = d1.Paragraphs(i).Range.Text
+    d2.SaveAs "路径"
+    d2.Close
+    i = i + 1
+Next p
+
+Word Open
+Dim i As Long, d As Document
+For i = 1 To 8
+  Set d = Application.Documents.Open("d:\vbWord\" & i & ".docx")
+  d.Sections(1).Headers(1).Range.Text = "WMXN"
+  d.Save
+  d.Close
+Next i
+
+Excel打开word
+set w = CreateObject("word.application")
+For i = 1 To 8
+  Set doc = w.documents.Open("d:\vbWord\" & i & ".docx")
+  Cells(i,1) = doc.Range.Text
+  doc.close
+Next i
+w.Quit
+
+GetObject可以直接得到对象,就不用CreateObject了
+且操作的文件不会打开，提高运行效率
+所以也可以GetObject("d:\vbWord\" & i & ".xlsx")
+For i = 1 To 8
+  Set doc = GetObject("d:\vbWord\" & i & ".docx")
+  Cells(i,1) = doc.Range.Text
+  doc.close
+Next i
+w.Quit
+
+Word的Tables
+Table有Cell(row,col)
+Table.Range.Copy
+Paragraph.Range.Copy
+Documents.Range.Paste
+
+Word的Range 和 Move
+Range(start,end)
+Range.Start 返回一个数字代表该Range的起始位置
+Range.End 返回一个数字代表该Range的终止位置
+Thisdocuments.Paragraphs(1).Range.Start
+Thisdocuments.Range.End 该文档最后一个字符，结尾是有一个看不见的字符代表结束
+newDoc.Range(newDoc.Range.End - 1, newDoc.Range.End - 1).InsertParagraph
+newDoc.Range(newDoc.Range.End - 1, newDoc.Range.End - 1).Paste
+Range.MoveStart(单位，数量) 将该range的对象的起点移动指定数量单位,负数向前正数向后
+Range.MoveEnd(单位，数量) 将该range的对象的终点移动指定数量单位,负数向前正数向后
+Range.MoveStart wdParagraph，-1 起点向前提高一个段落
+ 
+
+18. ADO访问外部数据库
+Dim con As Object, rst As Object, sql As String, i As String
+'创建连接对象
+Set con = CreateObject("Adodb.Connection")
+'连接数据库
+con.Open "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=d:\demodb.accdb"
+'查询语句
+sql = "select 课程号,课程名称,教师 from course"
+'创建结果集对象
+Set rst = CreateObject("Adodb.Recordset")
+'使用该结果集对象，沿con路线将sql发送给目标数据库，并接受数据库返回的查询结果
+rst.Open sql, con
+'将结果集中全部内容直接复制到B2单元格
+Range("B2").CopyFromRecordset rst
+'关闭连接
+rst.Close
+con.Close
+6:00
+
+19.
