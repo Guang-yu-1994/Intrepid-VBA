@@ -1,0 +1,315 @@
+1. Range.Find方法
+如果找不到返回Nothing
+Range.Find参数
+Matchcase 是否大小写敏感
+Lookat 单元个匹配，是长短完全相同内容相同填1(xlWhole)，还是只要包含目标字符串填2(xlPart)
+LookIn xlValues在单元格值中查找，xlFormulas在单元格公式中查找,xlComments在批注中查找
+SearchFormat True查询内容须符合格式 FALSE查询内容可以是任意格式
+eg.
+Application.FindFormat.Interior.Color = vbRed
+Application.FindFormat.Font.Bold = True
+Range.find("WXM",SearchFormat = True)
+After:= 从制定范围(不包含)开始向后查找，传入Range
+SearchOrder 按行查找xlByRows,按列查找xlByColumns
+SearchDirection 正向查找xlNext 反向查找xlPrevious
+
+注意：Find方法lookat,lookin,searchorder参数有记忆功能，最好写的时候指明
+
+Range.End 无法处理隐藏的单元格，只能单行或单列
+所以有几种方法找最后的格格：
+(1) Set r = Cells.SpecialCells(xlCellTypeLastCell) 少用
+缺点：被使用过就算最后一个单元格，被删除的行也不会更新结果
+(2) Find方法无法识别隐藏的范围
+Set r = Cells.Find("*",After:=Cells(1,1),SearchOrder:=xlPrevious,SearchOrder:=xlByRows) 找最后一行
+Set r = Cells.Find("*",After:=Cells(1,1),SearchOrder:=xlPrevious,SearchOrder:=xlByColumns) 找最后一列
+Set r = Columns(2).Find("*",After:=Cells(1,1),SearchOrder:=xlPrevious,SearchOrder:=xlByRows) 找最后一行
+(3)Find也无法解决的:
+Dim i as Long
+i = Rows.Count
+Do while i > 0
+  If Cells(i,2) <> "" Then Exit Do
+  i = i - 1
+Loop
+
+
+
+
+可查找通配符
+?一个字符
+*任意个数任意非空字符
+~转义字符
+
+
+2. Range.Sort方法
+(1) key无需写整列，写列中其中的单元格也可以
+Range.Sort key1:=Cells(3,2)
+Range.Sort key1:=Range("B:B")
+Range.Sort key1:=Range("B5")
+(2)Sort方法最多支持3个关键字key
+Range.Sort key1:=Range("B:B"), order1:=xlDescending _
+,key2:=Range("C:C"), order2:=xlAscending _
+,key3:=Range("D:D"), order3:=xlAscending
+(3)Header参数 
+xlYes 数据包含标题，标题也参与排序
+xlNo 数据不包含标题
+(4) MatchCase
+True 包含大小写
+False 不包含大小写
+(5)Orientation
+xlSortRows按行排序
+xlSortColumns 按列排序
+(6)SortMethod
+xlPinyin 按拼音排序
+xlStroke 按笔画数排序
+(7)DataOption1
+xlSortTextAsNumbers
+(8) OrderCustom:=N+1 用第N个自定义规则排序
+OrderCustom:=2
+代表自定义排序规则的第1个规则
+OrderCustom:=1表示不用自定义规则
+因为自定义规则不同电脑不同所以标准写法是
+Application.AddCustomList 添加规则（序列）
+Range.Sort中设定OrderCustom为该序列的编号+1
+Application.DeleteCustomList删除该序列
+EG:
+Application.AddCustomList Worksheets(1).Range("D10:D20")
+Range.Sort key1:=Cells(1,2), OrderCustom:=Application.CustomListCount + 1
+Application.DeleteCustomList Application.CustomListCount ''删除的时候不加1
+自定义排序要求被排序内容和自定义序列完全一致
+
+可以用数组赋值然后创建自定义排序
+dim mylist as Variant ' 此时要是变体
+mylist = Array("壹","贰","叁","肆","伍","陆",柒")
+然后
+Application.AddCustomList mylist
+(9)超过3个key的Sort
+多关键字排序就是多个关键字排序，执行顺序是从次要关键字到主要关键字
+For i = 5 to 2    '从第五列排到第一列，第五列最次要
+  r.sort Key1:=cells(1,i)
+Next i
+列不规则可以用数组先装好在来循环
+
+worksheet.Sort支持多关键字排序，可以录制宏查看
+
+
+3.用数组做循环快过读取单元格
+Dim arr()
+arr = usedrange.value
+
+4. 合并单元格 
+MergeArea返回合并区域
+For i = 3 to 14
+  set r = cells(i,5).MergeArea
+  cells(i,6) = cells(1,4) * r.cells(1,1)
+
+取消合并，为空白单元格填上原合并单元格的值的方法,最好是倒着合并
+顺着合并的方法：
+If cells(i,2).MergeCells Then
+  k = cells(i,2).mergeArea.rows.count
+  Cells(i,2).unMerge
+  Range(Cells(i, 2),cells(i + k - 1, 2)).Value = Cells(i, 2).Value
+  Next i
+End If
+ 
+5.Format函数
+i = 543.44444
+s = Format(i,"Currency")
+s = Format(i, "$.###") '三位小数美元，不足三位不补0
+s = Format(i, "$.000") '三位小数美元，不足三位补0
+s = Format(i, "$.000；($.000)；zero;-") '双引号用分号隔开，表示正数格式，负数格式，0，Null
+
+d = "2016/8/16"
+d = Format(d, "long date")
+d = Format(d, "m月第d天(公元yyyy年)，dddd")
+d = Format(d, "当周第w天，dddd")
+d = Format(d, "当年第ww周，dddd")
+Format中同样用\作为转义标识，如输入w,m能字母前需要加
+
+s = "王明鑫"
+r = Format(s,"@,  ")  ' 王,明鑫
+当@个数多于原文本，从右向左匹配字符，多出来的@是空格
+！与@结合使用，当@个数少于原文本字符数，不会自动不起，直接从右向左匹配
+！与@结合使用，当@个数多于原文本字符数，不会自动不起，直接从左到右匹配
+
+Format(string,期望格式，firstDayOfWeek,firstWeekOfYear) 'firstDayOfWeek:=vbMonday 周一作第一天
+
+6. 正则捕获组
+量词不能用于捕获组
+可结合多个正则解决问题
+
+零宽断言
+"北京西北京站北京北北京南站北京东站"
+"WMX-+?WMX" '懒惰搜索 
+"北京\S+?(?=北京|$)"  '找北京二字，然后若干个非空字符，找到某个位置，这个位置后面是北京二字,或者是全行的末尾
+
+VBA只支持顺序
+肯定顺序  (?=abc) 右边是abc  
+否定顺序  (?!abc) 右边不是abc
+肯定逆序  (?<=abc) 左边是abc
+否定逆序  (?<!abc) 左边不是abc
+
+(\d)(?=\d\d\d\d)+元 将第一个捕获组替换为第一个捕获组加","
+最好用[\s\S]代替.，因为.不能处理跨行
+
+7. Getopenfilename
+当允许多项选择，返回值是个数组，所以判断有没有选择用IsArray()
+
+8. GetSaveAsFilename 相当于可供用户选择的另存为， 返回字符串，可供后续saveas使用
+
+9. FileCopy
+filecopy("源文件名","目标路径和文件名") 如果文件不存在则出现差错
+源文件名和目标路径和文件名都是绝对路径，目标路径文件名不同则会自动更名
+Kill 文件名是删除文件
+RmDir 删除文件夹
+
+10. Getattr(文件或文件夹名称) 返回一个数字代表文件或文件夹类型属性， 返回16代表文件夹
+判断是否是文件夹
+if (GetAttr(x) AND vbDirectory) = vbDirectory Then
+
+Option Explicit
+Dim i As Long ' global i
+
+Sub demo()
+i = 1
+list "D:\ITs\Ludashi\"
+End Sub
+
+Sub list(folder)
+Dim fname, subfolders As Collection
+Set subfolders = New Collection
+
+fname = Dir(folder, vbDirectory)
+Do While fname <> ""
+    If fname <> "." And fname <> ".." Then
+        If (GetAttr(folder & fname) And vbDirectory) <> vbDirectory Then
+            Cells(i, 1) = folder & fname ' if normal file then write its name
+            i = i + 1
+        Else
+            subfolders.Add folder & fname & "\" ' if folder then add to collection
+        End If
+    End If
+    
+    fname = Dir
+Loop
+
+For Each fname In subfolders
+    list fname
+Next fname
+End Sub
+
+11. Worksheet.Printout 相当于打印
+from 制定本次打印的其实页码
+to 指定本次打印的最后一次页码
+Copies 重复打印分数
+ActivePrinter 指定活动打印机名称
+
+worksheet.Pagesetup 设置打印设置
+With ws.PageSetup
+  .PaperSize = xlPaperB5
+  .Orientation = xlLandscape
+  .Zoom = 150 '缩放比例	
+end with
+
+12. VBA定时运行
+Application.OnTime(EarliestTime,Procedure,LatestTime,Procedure)
+
+Option Explicit 
+Dim setTimes as Long
+
+Sub setTasks()
+If setTimes = 0 Then
+  Application.Ontime "2018/12/8 11:01:00" "printWorksheets" 
+  setTimes = 1
+End If
+end sub
+
+sub deleteTimer() '消除闹钟 所有参数必须一致
+  Application.Ontime "2018/12/8 11:01:00" "printWorksheets" schedule:=False
+End Sub
+
+Sub printWorksheets()
+  Worksheets(1).PrintOut
+  Msgbox "print done"
+End sub
+
+注意
+（1）每点击一次，指定程序就运行一次，不要多点。不点不运行
+（2）使用静态变量（子程序运行完仍然不消失的变量）
+Option Explicit下面模块级别的变量自动是静态变量
+(3)Ontime是将程序注入到Excel中，不是工作簿，级别工作簿关闭仍然有效，Excel会自动打开工作簿运行
+(4)如果工作簿更名，会出错
+（5）退出Excel就清零，虽然关闭工作簿不会
+
+13. Range.SpecialCells(Type, Value)定位
+'让r等于工作簿所有单元格中全部非空单元格构成的range (常量)
+Set r = sht.Cells.SpecialCells(xlCellTypeConstants)
+'用split将r的地址按逗号拆分, 放在数组中
+a = Split(r.Address, ",")
+
+或者
+Range.Areas属性
+如果该Range有多个独立区域组成，其中每个元素为Range对象
+For Each rng in sht.Cells.SpecialCells(xlCellTypeConstants).Areas
+	rng.copy ws2.Cells(i, 1)
+	i = i - rng.Rows.Count
+Next rng
+
+14.调整控件位置
+shapes("控件名称").top
+shapes("控件名称").left
+Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+Dim s As Shape, sht As Worksheet
+Set sht = Sheet1
+Set s = sht.Shapes("Button 4")
+s.Top = Target.Top
+s.Left = Target.Left + s.Width
+End Sub
+
+Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+Dim s As Shape, sht As Worksheet
+Set sht = Sheet1
+Set s = sht.Shapes("Button 4")
+s.Top = Application.ActiveWindow.VisibleRange.Top + Application.ActiveWindow.VisibleRange.Height - s.Height
+s.Left = Target.Left + s.Width
+End Sub
+
+15.常见
+装Range的数组必须是变体
+装split的结果的数组必须是字符串
+For each中的单变量必须是变体
+Err.Number 错误编号
+Err.Description 错误描述
+Err.Clear 错误清空
+
+Sub errordemo()
+Dim i As Integer
+i = 3
+On Error GoTo sthwrong
+Do While Cells(i, 2) <> ""
+    Cells(i, 2) = Cells(i, 3) / Cells(i, 4)
+    i = i + 1
+Loop
+Exit Sub
+sthwrong:
+    If Err.Number = 6 Then
+    	MsgBox "Cannot devided by 0"
+    ElseIf Err.Number > 0 Then
+	MsgBox "发生未知错误"
+    End If
+    Resume Next
+End Sub
+
+16. 字符编码
+VBE不支持Unicode
+但是spreadsheet支持
+遇到外文的用表格装字符串，再用变量代表表格内容操作
+
+17. 类模块
+跨模块调用变量少用public 变量
+用dim 变量，在模块1中写个函数调用这个变量，在模块2中使用该函数得到该变量
+Property Get声明只读属性
+
+
+
+
+
