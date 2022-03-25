@@ -317,4 +317,147 @@ rst.Close
 con.Close
 6:00
 
-19.
+
+
+1.循环某个Range的数据不再使用行列，而是用定义一个range来简化
+set r = Range("A1:G5")
+for i = 1 to r.rows.count
+    For j = 1 to r.columns,count
+	r.Cells.(i,j).Font.Color = vbGreen
+    Next
+Next
+
+2.Range的交集和并集
+Set r1 = Range("A3:H4")
+Set r2 = Range("B3:C4")
+Set r1 = Range("D3:E4")
+set ru = Union(r1,r2,r3)
+ru.Interior.color = vbGreen '并集
+set ri - Interset(r1,r2,r3) '交集
+
+3. CurrentRegion
+Range("A3").CurrentRegion 'A3的最左最右最上最下的区域
+
+4.Range的resize
+以该Range的左上角单元格为原点，生成一个指定大小的新Range对象
+Range("A1:C3").resize(2,1) 'A1到C3单元格的范围，从A1开始，选择2行一列的区域
+
+5.Range的Offset(向下几行，向右几行),是整个Range,也可以是单个单元格
+Range.Cells(1,1)该Range的第一行第一列个单元格
+
+6.Range的Merge
+Range("b2：c4").Merge ' 按行合并
+
+7. function的可选参数设置
+'当可选参数有默认值
+Function mySum(r as range, Optional useColumn as Boolean = False)
+End Function
+'当可选参数无默认值,IsMissing只能配合Variant,且可选参数不能有默认值
+Function mySum(a, Optional b)
+If IsMissing(b) Then
+    mySum = a + 1
+Else
+    mySum = a + b
+End Function
+
+8.按值传递
+Sub Main()
+Dim x as Integer
+x = 1
+Call submian(x)
+Msgbox x   ' 此时x是1，因为传递参数有ByVal，是吧X的值传入子过程，如果没有ByVal，是引用传递把x传到子过程，这个时候x是2
+End Sub
+
+Sub submain(ByVal a As Integer)
+a = a * 2
+End Sub
+
+9. Range的范围确定
+Range.Row  range左上角单元格行号
+Range.Column Range左上角单元格列号
+Range.Address Range的左上角到右下角的绝对引用位置
+Range.count range包含的单元格个数
+Range.Rows(1) 该Range中的第一行
+Range.HasFormula 判断单元格内容是否为公式
+Range.Formula 返回该单元格的公式为字符串，如无公式返回值
+Cells(1,1).Formula = "=25 * 2"
+
+10.UsedRange
+worksheet.usedrange该表使用过的单元格最左最上到最右最下
+但即便只是改过字体也算使用过的单元格
+
+11.表格数据转换为二维数组加速运算
+Dim a() '必须是动态数组，Variant.
+a = Range("A1:B5") '该动态数组下标从1开始的，特殊
+Range("C1:D5") = a '将数组写入Range
+
+如果是一维数组写入行可以直接写
+Range("C2:E2") = OneDimensionArray
+如果写入列
+Range("C2:C4") = Application.Transpose(OneDimensionArray)
+
+二维数组运算
+Dim TwoDimArray(2 To 5, 3 To 7)
+Ubound(TwoDimArray,1) ' 第一维度的最小下标
+Ubound(TwoDimArray,2) ' 第二维度的最小下标
+
+12.分工明确靠封装
+Eg.将每一个sheet中的UsedRange的红色字体的数字加总
+Sub demo()
+Dim w As Worksheet
+For Each w In Worksheets
+  w.Cells(1,1) = redSum(w.UsedRange)
+Next w
+End Sub
+
+Function redSum(r as Range)
+Dim s As Long, r1 As Range
+For Each r1 in r
+  If r1.Font.Color = vbRed Then
+    s = s + r1.value
+  End If
+Next r1
+redSum = s
+End Function
+这个function还可以直接在sheet中使用
+
+13.合并单元格
+多个单元格合并后,VBA认为还是多个单元格
+且只有第一个单元格的值为合并后显示的内容，其他单元格是空值
+Range.MergeCells属性
+当range完全是合并单元格，返回True
+当range完全不是合并单元格，返回false
+当range中部分是合并单元格，返回Null
+判断值是不是Null只能用IsNull函数
+If IsNull(range)
+
+也可以用于直接合并单元格
+Range("A1:B2").MergeCells = True
+
+Range("A1:B2").Merge True可以按行合并单元格
+Range("A1:B2").UnMerge 分割单元格
+
+14. Mod运算实现周期变化
+7 mod 3 = 1
+8 mod 3 = 2
+9 mod 3 = 0
+10 mod 3 = 1
+Eg.
+Dim myColor(3) As Long
+myColor(0) = vbRed: myColor(1) = vbYellow
+myColor(2) = vbBlue: myColor(3) = vbGreen
+i = 1
+Do while Cells(i, 1) <> ""
+    Cells(i, 1).Resize(1,4).Interior.Color = myColor((i-1) mod 4)
+    i = i + 1
+Loop
+
+Mod运算可判断奇偶数
+
+15. Rnd()返回一个0到1的double
+生产[a,b]区间随机整数公式：
+Int(Rnd() * (b - a + 1) + a)
+用Rnd()前需要加Randomize初始化随机种子
+
+16. VBA排序
+
