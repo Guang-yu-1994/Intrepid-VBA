@@ -85,3 +85,47 @@ For Each crng In BS_header
         Cells(1, Columns.Count).End(xlToLeft).Offset(0, 1).Value = crng.Value
     End If
 Next
+
+19. 多个筛选 AdvancedFilter
+Sub filter_internal(ByVal ledger_name As String)
+Sheets(ledger_name).Activate
+
+Dim financial As Range, original_rng As Range
+On Error Resume Next
+
+' filter the internal transactions
+Set financial = Cells.Find("Financial Row")
+Range(Cells(1, 1), financial.Offset(-1, 0)).EntireRow.Delete
+Set original_rng = Sheets(ledger_name).UsedRange
+Application.CutCopyMode = False
+original_rng.AdvancedFilter Action:=xlFilterInPlace, CriteriaRange:=Sheets("CompanyName").UsedRange, Unique:=False
+Application.CutCopyMode = True
+
+original_rng.Copy Cells(1, Sheets(ledger_name).UsedRange.Columns.Count + 1)
+Cells.AutoFilter
+
+original_rng.EntireColumn.Delete
+End Sub
+
+
+20. 表格排序
+
+Sub rearrange_FS()
+'sort the order of sheets
+Dim FS_order, i As Integer
+
+FS_order = Array("ConsolidatedPLperSub", "ConsolidatedPLperBrand", "ConsolidatedPLperRegion", "InternalSalesPerBrand", "InternalSalesPerRegion", "PLperBrand", "PLperRegion", "CompanyName", "SalesDetail", "COSDetail")
+For i = LBound(FS_order) To UBound(FS_order)
+    Sheets(FS_order(i)).Cells.EntireColumn.AutoFit
+    Sheets(FS_order(i)).Move after:=Sheets(i + 1)
+Next i
+
+End Sub
+
+21. Union 之后的range不能直接copy,要select之后用selection.copy
+但是遇到union之中的某个单元格有合并单元格的时候，select会直接吧那个单元格也选再里面
+这个时候可以利用一张工具表做中转处理，之后再删除
+另，工具表也可利用前期表格清空，先Add一张工具表，删除其他，导入其他，最后删除工具表
+
+
+
