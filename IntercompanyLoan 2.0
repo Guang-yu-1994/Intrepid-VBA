@@ -1,0 +1,575 @@
+Sub execute()
+    Call create_dir
+    BS_name = Application.GetOpenFilename("excels,*xls*", 1, "select balance sheet", , True)
+    On Error GoTo end_exit
+    For Each i In BS_name
+        Call import(i)
+        If ThisWorkbook.Sheets.Count > 1 Then
+            Call check_diff
+            Call format_table(ThisWorkbook.Sheets("summary"))
+            Call export
+        End If
+    Next
+    Call intercompany_loan_report
+end_exit:
+End Sub
+
+
+Sub import(ByVal BS_name As String)
+Application.ScreenUpdating = False
+Application.DisplayAlerts = False
+
+Dim row_head1 As Integer, row_head2 As Integer
+Dim row_body1 As Integer, row_body2 As Integer
+Dim used_col As Integer, used_row As Integer
+Dim rng As Range
+Dim arr()
+
+' Create sheet summary, clear content if exists
+On Error Resume Next
+ThisWorkbook.Sheets(1).Name = "summary"
+ThisWorkbook.Sheets("summary").Cells.Clear
+
+For Each sht In ThisWorkbook.Sheets
+    If sht.Name <> "summary" Then sht.Delete
+Next
+
+' Get data source from the balance sheet
+If TypeName(BS_name) <> "Boolean" Then
+    Set source_wb = Workbooks.Open(BS_name)
+    source_wb.Sheets(1).Copy after:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count)
+    source_wb.Close
+    ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count).Name = "data_source"
+End If
+
+
+
+' copy head of the table
+ThisWorkbook.Sheets("summary").Activate
+row_head1 = Sheets("data_source").Cells.Find("Financial Row").Row
+row_head2 = Sheets("data_source").Cells.Find("Current Assets").Row - 1
+Sheets("data_source").Range(row_head1 & ":" & row_head2).Copy Sheets("summary").Range("A1")
+row_head_num = row_head2 - row_head1 + 1
+
+' find how many columns in table
+ThisWorkbook.Sheets("summary").Activate
+Set last_cell = Cells.Find(What:="*", after:=Cells(1, 1), LookIn:=xlFormulas, LookAt:=xlPart, SearchOrder:=xlByColumns, SearchDirection:=xlPrevious, MatchCase:=False)
+used_col = last_cell.Column
+
+
+' unmerge the cells in the table head
+ThisWorkbook.Sheets("summary").Activate
+For Each rng In Range(Cells(1, 1), Cells(row_head_num, used_col))
+    rng.UnMerge
+Next
+
+
+' Get the name of the company to create a new header
+ThisWorkbook.Sheets("summary").Activate
+For i = 2 To used_col
+    For Each rng In Range(Cells(1, i), Cells(row_head_num, i))
+        If rng <> "" Then
+            Cells(row_head_num + 1, i) = rng
+            Exit For
+        End If
+    Next
+Next
+
+' Copy body of the table from data source
+ThisWorkbook.Sheets("summary").Activate
+row_body1 = Sheets("data_source").Cells.Find("27000 - - INTERCOMPANY LOAN -").Row + 1
+row_body2 = Sheets("data_source").Cells.Find("Total - 27000 - - INTERCOMPANY LOAN -").Row
+Sheets("data_source").Rows(row_body1 & ":" & row_body2).Copy Sheets("summary").Range("A" & row_head_num + 2)
+
+ 'Delete the columns of total
+ ' use array to store the column number of total, if delete one by one, cells(x,i) would change
+ ThisWorkbook.Sheets("summary").Activate
+i = 2
+Do While Cells(row_head_num + 1, i) <> ""
+    If Cells(row_head_num + 1, i).Value = "Total" Then
+        Cells(row_head_num + 1, i).EntireColumn.Delete
+        i = i - 1 ' delete causes cells(x,i) changes because 1 column lessed
+    End If
+    i = i + 1
+Loop
+
+' Delete parent company column
+ThisWorkbook.Sheets("summary").Activate
+Cells.Find("Parent Company").EntireColumn.Delete
+
+' Reformat the 1st column
+ThisWorkbook.Sheets("summary").Activate
+i = row_head_num + 2
+Do While Range("A" & i) <> ""
+    If Range("A" & i) Like "*Total*" Then
+        Range("A" & i) = "Total"
+    Else
+        Range("A" & i) = Split(Range("A" & i), "-")(2)
+    End If
+    i = i + 1
+Loop
+
+' Remake the header
+ThisWorkbook.Sheets("summary").Activate
+Sheets("summary").Range("1:" & row_head_num).Delete
+
+' rearrange the column order
+
+'' rename the  Intrepid Distilleries as Intrepid Spirits Ireland Ltd.
+Cells.Replace "Intrepid Distilleries", "Intrepid Spirits Ireland Ltd"
+
+''make column1 and row1 as *name*name* to better accomadate like function
+ThisWorkbook.Sheets("summary").Activate
+Set myreg = CreateObject("vbscript.regexp")
+With myreg
+    .Global = True
+    .Pattern = "\(|\)|\s|\." ' replace "(", ")", and space with "*"
+    i = 2
+    Do While Range("A" & i) <> ""
+        Range("A" & i) = .Replace(Range("A" & i), "*")
+        If Right(Range("A" & i), 1) <> "*" Then Range("A" & i) = Range("A" & i) & "*"
+        i = i + 1
+    Loop
+    
+    i = 2
+    Do While Cells(1, i) <> ""
+        If Cells(1, i) = "Intrepid Spirits Limited" Then Cells(1, i) = "Intrepid Spirits IRE"
+        Cells(1, i) = .Replace(Cells(1, i), "*")
+        If Right(Cells(1, i), 1) <> "*" Then Cells(1, i) = Cells(1, i) & "*"
+        If Left(Cells(1, i), 1) <> "*" Then Cells(1, i) = "*" & Cells(1, i)
+        i = i + 1
+    Loop
+End With
+
+
+'' insert columns
+ThisWorkbook.Sheets("summary").Activate
+Set last_cell = Cells.Find(What:="*", after:=Cells(1, 1), LookIn:=xlFormulas, LookAt:=xlPart, SearchOrder:=xlByColumns, SearchDirection:=xlPrevious, MatchCase:=False)
+used_col = last_cell.Column
+
+Range(Columns(2), Columns(used_col)).Select 'select multiple columns using column index
+col_nums = Selection.Columns.Count
+Selection.Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+
+
+'' rearrange columns
+ThisWorkbook.Sheets("summary").Activate
+i = 2
+Do While Range("A" & i) <> ""
+    For j = col_nums + 2 To col_nums * 2 + 1 ' go through the columns with data
+        If Cells(1, j) Like Range("A" & i) Or Range("A" & i) Like Cells(1, j) Then
+            Cells(1, j).EntireColumn.Copy Cells(1, i)
+            Cells(1, j).EntireColumn.Clear
+        End If
+    Next
+    i = i + 1
+Loop
+Range(Columns(i), Columns(Columns.Count)).Clear
+
+' reset the name of 1st column and row
+ThisWorkbook.Sheets("summary").Activate
+Set myreg = CreateObject("vbscript.regexp")
+With myreg
+    .Global = True
+    .Pattern = "\*"
+    i = 2
+    Do While Range("A" & i) <> ""
+        Range("A" & i) = .Replace(Range("A" & i), " ")
+        i = i + 1
+    Loop
+    
+    i = 2
+    Do While Cells(1, i) <> ""
+        Cells(1, i) = .Replace(Cells(1, i), " ")
+        i = i + 1
+    Loop
+End With
+
+
+' date of the balance
+ThisWorkbook.Sheets("summary").Activate
+Range("A1").Select
+Range("A1") = Sheets("data_source").Range("A4")
+
+Application.ScreenUpdating = True
+Application.DisplayAlerts = True
+End Sub
+
+Sub check_diff()
+Dim rng As Range, data_rng As Range
+Dim check_header_row As Integer
+
+ThisWorkbook.Sheets("summary").Activate
+check_header_row = Cells(1, 1).End(xlDown).Row + 3
+
+Range("A" & check_header_row) = "Item 1"
+Range("B" & check_header_row) = "Amount 1"
+Range("C" & check_header_row) = "Item 2"
+Range("D" & check_header_row) = "Amount 2"
+Range("E" & check_header_row) = "Difference"
+Range("O" & check_header_row) = "Same company 1"
+Range("P" & check_header_row) = "Amount 3"
+Range("Q" & check_header_row) = "Same company 2"
+Range("R" & check_header_row) = "Amount 4"
+
+used_col = Range("A1").End(xlToRight).Column
+used_row = Range("A2").End(xlDown).Row - 1
+Set data_rng = Range(Cells(1, 1), Cells(used_row, used_col))
+
+check_body_row = check_header_row + 1
+same_co_num = check_header_row + 1
+For data_row = 2 To data_rng.Rows.Count
+    For data_col = 2 To data_rng.Columns.Count
+        If data_row = data_col Then
+            ' only record Non-0 error
+            If data_rng(data_row, data_col) <> 0 Then
+                Range("O" & same_co_num) = data_rng(data_row, 1) & "by" & data_rng(1, data_col)
+                Range("P" & same_co_num) = data_rng(data_row, data_col)
+                data_rng(data_row, data_col).Interior.Color = vbGreen
+                same_co_num = same_co_num + 1
+            End If
+        ElseIf data_row < data_col Then
+            Range("A" & check_body_row) = data_rng(data_row, 1) & "by" & data_rng(1, data_col)
+            Range("B" & check_body_row) = data_rng(data_row, data_col)
+'            data_rng(data_row, data_col).Interior.Color = vbYellow
+            check_body_row = check_body_row + 1
+        End If
+    Next
+Next
+
+
+check_body_row = check_header_row + 1
+same_co_num = check_header_row + 1
+For data_col = 2 To data_rng.Columns.Count
+    For data_row = 2 To data_rng.Rows.Count
+        If data_row = data_col Then
+            ' only record Non-0 error
+            If data_rng(data_row, data_col) <> 0 Then
+                Range("Q" & same_co_num) = data_rng(data_row, 1) & "to" & data_rng(1, data_col)
+                Range("R" & same_co_num) = data_rng(data_row, data_col)
+                data_rng(data_row, data_col).Interior.Color = vbGreen
+                same_co_num = same_co_num + 1
+            End If
+        ElseIf data_row > data_col Then
+            Range("C" & check_body_row) = data_rng(data_row, 1) & "to" & data_rng(1, data_col)
+            Range("D" & check_body_row) = data_rng(data_row, data_col)
+'            data_rng(data_row, data_col).Interior.Color = vbBlue
+            check_body_row = check_body_row + 1
+        End If
+    Next
+Next
+
+
+check_body_row = check_header_row + 1
+until_row = Range("A" & check_body_row).End(xlDown).Row
+Range("E" & check_body_row & ":E" & until_row).Formula2R1C1 = "=sum(RC[-3],RC[-1])"
+
+
+
+''copy the analytical table to columnA
+Range("A" & check_header_row & ":E" & until_row).AutoFilter Field:=5, Criteria1:="<>0"
+Range("A" & check_header_row).CurrentRegion.Copy
+Range("G" & check_header_row).PasteSpecial Paste:=xlPasteAll
+Range("A" & check_header_row).CurrentRegion.AutoFilter
+Range("A" & check_header_row & ":E" & until_row).Clear
+Range("G" & check_header_row).CurrentRegion.Copy
+Range("A" & check_header_row).PasteSpecial Paste:=xlPasteAll
+Range("G" & check_header_row).CurrentRegion.Clear
+
+'
+table_row = Range("A" & check_header_row).End(xlDown).Row
+table_col = Range("A" & check_header_row).End(xlToLeft).Column
+Cells(table_row + 1, 1) = "Total_diff"
+Cells(table_row + 1, 2).FormulaR1C1 = "=SUM(R[" & -table_row + check_header_row & "]C:R[-1]C)"
+Cells(table_row + 1, 4).FormulaR1C1 = "=SUM(R[" & -table_row + check_header_row & "]C:R[-1]C)"
+Cells(table_row + 1, 5).FormulaR1C1 = "=SUM(R[" & -table_row + check_header_row & "]C:R[-1]C)"
+
+''' copy the same company data to columnG
+Range("O" & check_header_row & ":R" & same_co_num).Copy Range("G" & check_header_row)
+Range("O" & check_header_row & ":R" & same_co_num).Clear
+
+'same_co_row = Range("G" & check_header_row).End(xlDown).Row
+Range("G" & same_co_num) = "Total"
+Range("H" & same_co_num) = "=sum(R[" & -same_co_num + check_header_row + 1 & "]C:R[-1]C)"
+Range("J" & same_co_num) = "=sum(R[" & -same_co_num + check_header_row + 1 & "]C:R[-1]C)"
+End Sub
+
+Sub format_table(sht As Worksheet)
+' format the table
+sht.Activate
+Cells.Select
+With Selection.Font
+    .Name = "Calibri Light"
+    .Size = 10
+End With
+
+With Selection
+    .HorizontalAlignment = xlCenter
+    .VerticalAlignment = xlCenter
+    .ColumnWidth = 15
+    .WrapText = True
+End With
+End Sub
+Sub export()
+Application.ScreenUpdating = False
+Application.DisplayAlerts = False
+BS_string = Split(ThisWorkbook.Sheets("summary").Range("A1").Value, " ")
+BS_year = BS_string(3)
+
+Set Month_dict = CreateObject("Scripting.Dictionary")
+Month_dict("Jan") = "01"
+Month_dict("Feb") = "02"
+Month_dict("Mar") = "03"
+Month_dict("Apr") = "04"
+Month_dict("May") = "05"
+Month_dict("Jun") = "06"
+Month_dict("Jul") = "07"
+Month_dict("Aug") = "08"
+Month_dict("Sep") = "09"
+Month_dict("Oct") = "10"
+Month_dict("Nov") = "11"
+Month_dict("Dec") = "12"
+BS_month = Month_dict(BS_string(2))
+
+BS_date = BS_year & BS_month
+
+
+myPath = ThisWorkbook.Path & "\intercompany_checked\" & BS_date & " intercompany loan check.xlsx"
+ThisWorkbook.Sheets("summary").Copy
+ActiveWorkbook.SaveAs Filename:=myPath
+ActiveWorkbook.Close
+
+Application.ScreenUpdating = True
+Application.DisplayAlerts = True
+End Sub
+Sub create_dir()
+Dim intercompany_checked As String
+intercompany_checked = ThisWorkbook.Path & "\intercompany_checked\"
+If Len(Dir(intercompany_checked, vbDirectory)) > 0 Then
+    If Dir(intercompany_checked & "*.*") <> "" Then
+        Kill intercompany_checked & "*.*"
+    End If
+    RmDir intercompany_checked
+    MkDir intercompany_checked
+Else
+    MkDir intercompany_checked
+End If
+End Sub
+Sub intercompany_loan_report()
+Application.ScreenUpdating = False
+Application.DisplayAlerts = False
+Dim sht As Worksheet
+Dim report As Workbook
+If Len(Dir(ThisWorkbook.Path & "\ intercompany_report.xlsx")) > 0 Then
+    Kill ThisWorkbook.Path & "\ intercompany_report.xlsx"
+End If
+
+Set report = Workbooks.Add
+report.Sheets.Add after:=Sheets(Sheets.Count)
+Sheets(Sheets.Count).Name = "IntercompanyLoanReport"
+Sheets("IntercompanyLoanReport").Cells(1, 1) = "Difference"
+
+report.Sheets.Add after:=Sheets(Sheets.Count)
+Sheets(Sheets.Count).Name = "ErrorData"
+Sheets("ErrorData").Cells(1, 1) = "Error"
+
+report.SaveAs ThisWorkbook.Path & "\ intercompany_report.xlsx"
+report.Close
+
+
+Call extract_report_data("difference")
+Call extract_report_data("error")
+
+' extract_report_data closed wb, so reopen if wanna change sth
+Set report = Application.Workbooks.Open(ThisWorkbook.Path & "\ intercompany_report.xlsx")
+wb_start_date = report.Sheets("ErrorData").Cells(1, 2).Value
+wb_end_date = report.Sheets("ErrorData").Cells(1, Columns.Count).End(xlToLeft).Value
+
+
+Set report = Workbooks.Open(ThisWorkbook.Path & "\ intercompany_report.xlsx")
+'' Copy All sheets to sheet1
+report.Activate
+Sheets("IntercompanyLoanReport").UsedRange.Copy Sheets("sheet1").Cells(1, 1)
+Set diff_total = report.Sheets("sheet1").Cells(Rows.Count, 1).End(xlUp)
+diff_total.Value = "Total Diff"
+report.Sheets("ErrorData").UsedRange.Copy report.Sheets("sheet1").Cells(diff_total.Row + 1, 1)
+' delete the header duplicated
+Set header_dup = report.Sheets("sheet1").Cells.Find("Error")
+header_dup.EntireRow.Delete
+Set error_total = report.Sheets("sheet1").Cells(Rows.Count, 1).End(xlUp)
+error_total.Value = "Total Error"
+Set total_error_and_diff = error_total.Offset(1, 0)
+total_error_and_diff.Value = "Total Diff and Error"
+sum_row = total_error_and_diff.Row
+sum_col_start = total_error_and_diff.Column + 1
+sum_col_end = error_total.End(xlToRight).Column
+report.Sheets("sheet1").Activate
+Range(Cells(sum_row, sum_col_start), Cells(sum_row, sum_col_end)).FormulaR1C1 = "=sum(R[-1]C,R[" & -sum_row + diff_total.Row & "]C)"
+
+report.Sheets("sheet1").Cells(1, 1) = "Items"
+report.Sheets("sheet1").Name = "SummaryReport"
+
+' format table
+For Each sht In report.Worksheets
+    Call format_table(sht)
+Next
+
+report.Sheets("SummaryReport").Activate
+With Range(Cells(1, 1), Cells(1, 1).End(xlToRight))
+    .Font.Bold = True
+    .Font.Size = 14
+End With
+
+With Range(diff_total, diff_total.End(xlToRight))
+    .Font.Bold = True
+    .Interior.Color = vbGreen
+End With
+
+With Range(error_total, error_total.End(xlToRight))
+    .Font.Bold = True
+    .Interior.Color = vbGreen
+End With
+
+With Range(total_error_and_diff, total_error_and_diff.End(xlToRight))
+    .Font.Bold = True
+    .Interior.Color = vbYellow
+End With
+
+'' check diff change
+Set source_rng = report.Sheets("SummaryReport").UsedRange
+If source_rng.Columns.Count > 2 Then
+    Set change_rng = report.Sheets("SummaryReport").UsedRange.Offset(0, source_rng.Columns.Count + 2)
+    source_rng.Copy change_rng
+    
+    Set change_num_rng = Range(change_rng(2, 3), change_rng(change_rng.Rows.Count, change_rng.Columns.Count))
+    
+    For col = 1 To change_num_rng.Columns.Count
+        change_num_rng.Columns(col).FormulaR1C1 = "=RC[" & -source_rng.Columns.Count - 2 & "]-RC[" & -source_rng.Columns.Count - 3 & "]"
+    Next col
+    
+    ' check Non -0
+    change_num_rng.FormatConditions.Add Type:=xlCellValue, Operator:=xlNotEqual, Formula1:="=0"
+    change_num_rng.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+        With change_num_rng.FormatConditions(1).Font
+            .Color = vbBlue
+            .Bold = True
+        End With
+    change_num_rng.FormatConditions(1).StopIfTrue = False
+    
+    ' reformat change rng
+    Set change_rng_header = Range(change_rng(1, 1), change_rng(1, change_rng.Columns.Count))
+    change_rng_header(1) = "Change of Diff"
+    For col = change_rng_header.Count To 2 Step -1
+        change_rng_header(col).Value = change_rng_header(col - 1).Value & " to " & change_rng_header(col).Value
+    Next col
+    
+    change_rng_header(2).EntireColumn.Delete
+End If
+
+report.SaveAs ThisWorkbook.Path & "\" & wb_start_date & "-" & wb_end_date & " intercompany_report.xlsx"
+report.Close
+
+' delete previous intercompany_report.xlsx
+If Len(Dir(ThisWorkbook.Path & "\ intercompany_report.xlsx")) > 0 Then
+    Kill ThisWorkbook.Path & "\ intercompany_report.xlsx"
+End If
+
+Application.ScreenUpdating = True
+Application.DisplayAlerts = True
+End Sub
+Sub extract_report_data(ByVal diff_or_error As String)
+Application.ScreenUpdating = False
+Application.DisplayAlerts = False
+Dim key_word As String, report_sheet As String, intercompany_checked As String, fname As String
+Dim wb_nums As Integer
+'Public wb_start_date As Long, wb_date As Long, wb_end_date As Long
+
+If diff_or_error = "difference" Then
+    key_word = "Item 1"
+    report_sheet = "IntercompanyLoanReport"
+Else
+    key_word = "Same company 1"
+    report_sheet = "ErrorData"
+End If
+
+Dim report As Workbook
+Set report = Application.Workbooks.Open(ThisWorkbook.Path & "\ intercompany_report.xlsx")
+
+' help determine the diff data columns
+wb_nums = 1
+intercompany_checked = ThisWorkbook.Path & "\intercompany_checked\"
+fname = Dir(intercompany_checked)
+wb_start_date = CLng(Left(fname, 6))
+
+Do While fname <> ""
+    Set source_wb = GetObject(intercompany_checked & fname)
+    Set start_cell = source_wb.Sheets("summary").Cells.Find(What:=key_word)
+    data_start_row = start_cell.Row + 1
+    data_start_col = start_cell.Column
+    data_end_row = start_cell.End(xlDown).Row - 1
+    data_end_col = start_cell.End(xlToRight).Column
+    
+    report.Sheets(report_sheet).Activate
+    report_use_col = Cells(1, Columns.Count).End(xlToLeft).Column + 1
+    report_use_row = Cells(Rows.Count, report_use_col).End(xlUp).Row + 1
+    Cells(report_use_row - 1, report_use_col) = Left(fname, 6)
+    
+    ' 1st workbook copy its items
+    Set name_rng = source_wb.Sheets("summary").Range(source_wb.Sheets("summary").Cells(data_start_row, data_start_col), source_wb.Sheets("summary").Cells(data_end_row, data_start_col))
+    If wb_nums = 1 Then
+        name_rng.Copy Cells(2, 1)
+    End If
+    Set amount_rng = source_wb.Sheets("summary").Range(source_wb.Sheets("summary").Cells(data_start_row, data_end_col), source_wb.Sheets("summary").Cells(data_end_row, data_end_col))
+
+    ' name range of report
+    report_last_name_row = Cells(Rows.Count, 1).End(xlUp).Row
+    Set report_name_rng = Range(Cells(2, 1), Cells(report_last_name_row, 1))
+   
+    
+    For i = 1 To name_rng.Count
+        Set find_item = report_name_rng.Find(What:=name_rng(i).Value, LookAt:=xlPart)
+        If find_item Is Nothing Then
+            Cells(report_last_name_row + 1, 1) = name_rng(i)
+            Cells(report_last_name_row + 1, 1).Offset(0, wb_nums) = amount_rng(i)
+            report_last_name_row = report_last_name_row + 1
+            Set report_name_rng = Range(Cells(2, 1), Cells(report_last_name_row, 1))
+        Else
+            find_item.Offset(0, wb_nums) = amount_rng(i)
+        End If
+    Next
+    source_wb.Close False
+    wb_nums = wb_nums + 1
+    fname = Dir
+    If fname <> "" Then
+        wb_date = CLng(Left(fname, 6))
+    End If
+    If wb_date > wb_start_date Then
+        wb_end_date = wb_date
+    Else
+        wb_start_date = wb_date
+    End If
+Loop
+
+'' replace by
+report.Sheets(report_sheet).Activate
+Cells.Replace What:="by", Replacement:="VS", LookAt:=xlPart, _
+SearchOrder:=xlByRows, MatchCase:=False, SearchFormat:=False, _
+ReplaceFormat:=False, FormulaVersion:=xlReplaceFormula2
+
+'' calculate sum of diff for each month
+use_row = Cells(1, 1).CurrentRegion.Rows.Count
+use_col = Cells(1, 1).CurrentRegion.Columns.Count
+Cells(use_row + 1, 1) = "Total"
+Range(Cells(use_row + 1, 2), Cells(use_row + 1, use_col)).Formula2R1C1 = "=sum(R[" & -use_row + 1 & "]C:R[-1]C)"
+report.Close True
+
+Application.ScreenUpdating = True
+Application.DisplayAlerts = True
+End Sub
+
+
+
+
+
+
+
